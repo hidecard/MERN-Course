@@ -225,9 +225,8 @@ const AdminPage = () => {
    const postData = new FormData();
    postData.append('title', lessonFormData.title);
    postData.append('video', lessonFormData.video);
-   postData.append('courseId', currentCourse._id);
    try {
-     await axios.post('/api/lessons', postData, {
+     await axios.post(`/api/courses/${currentCourse._id}/lessons`, postData, {
        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
      });
      handleLessonDialogClose();
