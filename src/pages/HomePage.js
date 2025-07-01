@@ -81,7 +81,7 @@ const HomePage = () => {
               <CardMedia
                 component="img"
                 height="140"
-                image={`https://source.unsplash.com/random/?${course.category}`}
+                image={`http://localhost:5000/${course.thumbnail}`}
                 alt={course.title}
               />
               <CardContent>

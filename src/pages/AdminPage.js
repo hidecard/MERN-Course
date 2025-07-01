@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { Edit, Delete } from '@mui/icons-material';
 import axios from 'axios';
+import { Select, MenuItem, InputLabel, FormControl } from '@mui/material';
 
 const TabPanel = (props) => {
   const { children, value, index, ...other } = props;
@@ -46,12 +47,25 @@ const AdminPage = () => {
   const [users, setUsers] = useState([]);
   const [open, setOpen] = useState(false);
   const [currentCourse, setCurrentCourse] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [openUserDialog, setOpenUserDialog] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: '',
+    teacher: '',
     level: '',
+    category: '',
+    thumbnail: null,
+    startDate: '',
+    endDate: '',
+    duration: '',
   });
+  const [userFormData, setUserFormData] = useState({
+   name: '',
+   email: '',
+   password: '',
+   role: 'student',
+  })
   const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
@@ -87,10 +101,15 @@ const AdminPage = () => {
         ? {
             title: course.title,
             description: course.description,
-            category: course.category,
+            teacher: course.teacher,
             level: course.level,
+            category: course.category,
+            thumbnail: course.thumbnail,
+            startDate: course.startDate ? new Date(course.startDate).toISOString().split('T')[0] : '',
+            endDate: course.endDate ? new Date(course.endDate).toISOString().split('T')[0] : '',
+            duration: course.duration,
           }
-        : { title: '', description: '', category: '', level: '' }
+        : { title: '', description: '', teacher: '', level: '', category: '', thumbnail: null, startDate: '', endDate: '', duration: '' }
     );
     setOpen(true);
   };
@@ -100,9 +119,32 @@ const AdminPage = () => {
     setCurrentCourse(null);
   };
 
+  const handleUserClickOpen = (user = null) => {
+   setCurrentUser(user);
+   setUserFormData(
+     user
+       ? { name: user.name, email: user.email, role: user.role }
+       : { name: '', email: '', password: '', role: 'student' }
+   );
+   setOpenUserDialog(true);
+ };
+
+ const handleUserDialogClose = () => {
+   setOpenUserDialog(false);
+   setCurrentUser(null);
+ };
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (e.target.name === 'thumbnail') {
+      setFormData({ ...formData, thumbnail: e.target.files[0] });
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
   };
+
+ const handleUserFormChange = (e) => {
+   setUserFormData({ ...userFormData, [e.target.name]: e.target.value });
+ };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -110,14 +152,18 @@ const AdminPage = () => {
 
   const handleSubmit = async () => {
     const token = localStorage.getItem('token');
+    const postData = new FormData();
+    for (const key in formData) {
+      postData.append(key, formData[key]);
+    }
     try {
       if (currentCourse) {
-        await axios.put(`/api/courses/${currentCourse._id}`, formData, {
-          headers: { Authorization: `Bearer ${token}` },
+        await axios.put(`/api/courses/${currentCourse._id}`, postData, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        await axios.post('/api/courses', formData, {
-          headers: { Authorization: `Bearer ${token}` },
+        await axios.post('/api/courses', postData, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
         });
       }
       fetchCourses();
@@ -126,6 +172,25 @@ const AdminPage = () => {
       console.error(err);
     }
   };
+
+ const handleUserSubmit = async () => {
+   const token = localStorage.getItem('token');
+   try {
+     if (currentUser) {
+       await axios.put(`/api/users/${currentUser._id}`, userFormData, {
+         headers: { Authorization: `Bearer ${token}` },
+       });
+     } else {
+       await axios.post('/api/users', userFormData, {
+         headers: { Authorization: `Bearer ${token}` },
+       });
+     }
+     fetchUsers();
+     handleUserDialogClose();
+   } catch (err) {
+     console.error(err);
+   }
+ };
 
   const handleDeleteCourse = async (id) => {
     const token = localStorage.getItem('token');
@@ -200,11 +265,25 @@ const AdminPage = () => {
           </List>
         </TabPanel>
         <TabPanel value={tabValue} index={1}>
+         <Button
+           variant="contained"
+           color="primary"
+           onClick={() => handleUserClickOpen()}
+         >
+           Create User
+         </Button>
           <List>
-            {users.map((user) => (
+            {users.filter(u => u.role !== 'teacher').map((user) => (
               <ListItem key={user._id} divider>
                 <ListItemText primary={user.name} secondary={user.email} />
                 <ListItemSecondaryAction>
+                   <IconButton
+                       edge="end"
+                       aria-label="edit"
+                       onClick={() => handleUserClickOpen(user)}
+                   >
+                       <Edit />
+                   </IconButton>
                   <IconButton
                     edge="end"
                     aria-label="delete"
@@ -218,7 +297,36 @@ const AdminPage = () => {
           </List>
         </TabPanel>
         <TabPanel value={tabValue} index={2}>
-          <Typography>Teacher management coming soon...</Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => handleUserClickOpen()}
+          >
+            Create Teacher
+          </Button>
+        <List>
+            {users.filter(u => u.role === 'teacher').map((user) => (
+              <ListItem key={user._id} divider>
+                <ListItemText primary={user.name} secondary={user.email} />
+                <ListItemSecondaryAction>
+                   <IconButton
+                       edge="end"
+                       aria-label="edit"
+                       onClick={() => handleUserClickOpen(user)}
+                   >
+                       <Edit />
+                   </IconButton>
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={() => handleDeleteUser(user._id)}
+                  >
+                    <Delete />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              </ListItem>
+            ))}
+          </List>
         </TabPanel>
       </Box>
       <Dialog open={open} onClose={handleClose}>
@@ -250,16 +358,25 @@ const AdminPage = () => {
             value={formData.description}
             onChange={handleChange}
           />
-          <TextField
-            margin="dense"
-            name="category"
-            label="Category"
-            type="text"
-            fullWidth
-            variant="standard"
-            value={formData.category}
-            onChange={handleChange}
-          />
+          <FormControl fullWidth margin="dense" variant="standard">
+            <InputLabel id="teacher-select-label">Teacher</InputLabel>
+            <Select
+              labelId="teacher-select-label"
+              id="teacher-select"
+              name="teacher"
+              value={formData.teacher}
+              onChange={handleChange}
+              label="Teacher"
+            >
+              {users
+                .filter((user) => user.role === 'teacher')
+                .map((teacher) => (
+                  <MenuItem key={teacher._id} value={teacher._id}>
+                    {teacher.name}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
           <TextField
             margin="dense"
             name="level"
@@ -270,6 +387,62 @@ const AdminPage = () => {
             value={formData.level}
             onChange={handleChange}
           />
+          <TextField
+            margin="dense"
+            name="category"
+            label="Category"
+            type="text"
+            fullWidth
+            variant="standard"
+            value={formData.category}
+            onChange={handleChange}
+          />
+          <Button variant="contained" component="label" sx={{ mt: 2 }}>
+            Upload Thumbnail
+            <input
+              type="file"
+              name="thumbnail"
+              hidden
+              onChange={handleChange}
+            />
+          </Button>
+          {formData.thumbnail && <Typography variant="body2" sx={{ mt: 1 }}>{typeof formData.thumbnail === 'string' ? formData.thumbnail : formData.thumbnail.name}</Typography>}
+         <TextField
+           margin="dense"
+           name="startDate"
+           label="Start Date"
+           type="date"
+           fullWidth
+           variant="standard"
+           value={formData.startDate}
+           onChange={handleChange}
+           InputLabelProps={{
+             shrink: true,
+           }}
+         />
+         <TextField
+           margin="dense"
+           name="endDate"
+           label="End Date"
+           type="date"
+           fullWidth
+           variant="standard"
+           value={formData.endDate}
+           onChange={handleChange}
+           InputLabelProps={{
+             shrink: true,
+           }}
+         />
+         <TextField
+           margin="dense"
+           name="duration"
+           label="Duration"
+           type="text"
+           fullWidth
+           variant="standard"
+           value={formData.duration}
+           onChange={handleChange}
+         />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
@@ -278,6 +451,63 @@ const AdminPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+     <Dialog open={openUserDialog} onClose={handleUserDialogClose}>
+       <DialogTitle>{currentUser ? 'Edit User' : 'Create User'}</DialogTitle>
+       <DialogContent>
+         <TextField
+           autoFocus
+           margin="dense"
+           name="name"
+           label="Name"
+           type="text"
+           fullWidth
+           variant="standard"
+           value={userFormData.name}
+           onChange={handleUserFormChange}
+         />
+         <TextField
+           margin="dense"
+           name="email"
+           label="Email"
+           type="email"
+           fullWidth
+           variant="standard"
+           value={userFormData.email}
+           onChange={handleUserFormChange}
+         />
+         {!currentUser && (
+           <TextField
+             margin="dense"
+             name="password"
+             label="Password"
+             type="password"
+             fullWidth
+             variant="standard"
+             value={userFormData.password}
+             onChange={handleUserFormChange}
+           />
+         )}
+         <FormControl fullWidth margin="dense" variant="standard">
+           <InputLabel id="role-select-label">Role</InputLabel>
+           <Select
+             labelId="role-select-label"
+             id="role-select"
+             name="role"
+             value={userFormData.role}
+             onChange={handleUserFormChange}
+             label="Role"
+           >
+             <MenuItem value="student">Student</MenuItem>
+             <MenuItem value="teacher">Teacher</MenuItem>
+             <MenuItem value="admin">Admin</MenuItem>
+           </Select>
+         </FormControl>
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={handleUserDialogClose}>Cancel</Button>
+         <Button onClick={handleUserSubmit}>{currentUser ? 'Save' : 'Create'}</Button>
+       </DialogActions>
+     </Dialog>
     </Container>
   );
 };

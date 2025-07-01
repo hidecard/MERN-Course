@@ -19,19 +19,24 @@ const CoursePage = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lessons, setLessons] = useState([]);
 
   useEffect(() => {
-    const fetchCourse = async () => {
+    const fetchCourseAndLessons = async () => {
       try {
-        const res = await axios.get(`/api/courses/${id}`);
-        setCourse(res.data.data);
+        const [courseRes, lessonsRes] = await Promise.all([
+          axios.get(`/api/courses/${id}`),
+          axios.get(`/api/courses/${id}/lessons`),
+        ]);
+        setCourse(courseRes.data.data);
+        setLessons(lessonsRes.data.data);
         setLoading(false);
       } catch (err) {
         setError('Course not found');
         setLoading(false);
       }
     };
-    fetchCourse();
+    fetchCourseAndLessons();
   }, [id]);
 
   const handleEnroll = async () => {
@@ -43,7 +48,7 @@ const CoursePage = () => {
       }
       await axios.post(
         `/api/enrollments`,
-        { courseId: id },
+        { course: id },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -82,19 +87,28 @@ const CoursePage = () => {
           <Typography variant="body1" gutterBottom>
             {course.description}
           </Typography>
+          <Typography variant="body1" gutterBottom>
+            <strong>Start Date:</strong> {new Date(course.startDate).toLocaleDateString()}
+          </Typography>
+          <Typography variant="body1" gutterBottom>
+            <strong>End Date:</strong> {new Date(course.endDate).toLocaleDateString()}
+          </Typography>
+          <Typography variant="body1" gutterBottom>
+            <strong>Duration:</strong> {course.duration}
+          </Typography>
           <Typography variant="h6" component="h2" sx={{ mt: 4 }}>
             Lessons
           </Typography>
           <List>
-            {course.lessons.map((lesson, index) => (
+            {lessons.map((lesson, index) => (
               <React.Fragment key={lesson._id}>
                 <ListItem>
                   <ListItemText
                     primary={lesson.title}
-                    secondary={lesson.content}
+                    secondary={<video src={`http://localhost:5000/${lesson.video}`} width="320" height="240" controls />}
                   />
                 </ListItem>
-                {index < course.lessons.length - 1 && <Divider />}
+                {index < lessons.length - 1 && <Divider />}
               </React.Fragment>
             ))}
           </List>
