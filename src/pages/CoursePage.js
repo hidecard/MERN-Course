@@ -24,9 +24,11 @@ const CoursePage = () => {
   useEffect(() => {
     const fetchCourseAndLessons = async () => {
       try {
+        const token = localStorage.getItem('token');
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         const [courseRes, lessonsRes] = await Promise.all([
           axios.get(`/api/courses/${id}`),
-          axios.get(`/api/courses/${id}/lessons`),
+          axios.get(`/api/courses/${id}/lessons`, config),
         ]);
         setCourse(courseRes.data.data);
         setLessons(lessonsRes.data.data);

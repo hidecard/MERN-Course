@@ -17,8 +17,11 @@ import {
   IconButton,
   Tab,
   Tabs,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
-import { Edit, Delete } from '@mui/icons-material';
+import { Edit, Delete, ExpandMore } from '@mui/icons-material';
 import axios from 'axios';
 import { Select, MenuItem, InputLabel, FormControl } from '@mui/material';
 
@@ -49,6 +52,12 @@ const AdminPage = () => {
   const [currentCourse, setCurrentCourse] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [openUserDialog, setOpenUserDialog] = useState(false);
+  const [openLessonDialog, setOpenLessonDialog] = useState(false);
+  const [lessonFormData, setLessonFormData] = useState({
+    title: '',
+    video: null,
+  });
+  const [enrollments, setEnrollments] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -129,6 +138,25 @@ const AdminPage = () => {
    setOpenUserDialog(true);
  };
 
+  const handleLessonClickOpen = (course) => {
+    setCurrentCourse(course);
+    setOpenLessonDialog(true);
+  };
+
+  const handleLessonDialogClose = () => {
+    setOpenLessonDialog(false);
+    setCurrentCourse(null);
+    setLessonFormData({ title: '', video: null });
+  };
+
+  const handleLessonFormChange = (e) => {
+    if (e.target.name === 'video') {
+      setLessonFormData({ ...lessonFormData, video: e.target.files[0] });
+    } else {
+      setLessonFormData({ ...lessonFormData, [e.target.name]: e.target.value });
+    }
+  };
+
  const handleUserDialogClose = () => {
    setOpenUserDialog(false);
    setCurrentUser(null);
@@ -174,19 +202,35 @@ const AdminPage = () => {
   };
 
  const handleUserSubmit = async () => {
+  const token = localStorage.getItem('token');
+  try {
+    if (currentUser) {
+      await axios.put(`/api/users/${currentUser._id}`, userFormData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } else {
+      await axios.post('/api/users', userFormData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    fetchUsers();
+    handleUserDialogClose();
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+ const handleLessonSubmit = async () => {
    const token = localStorage.getItem('token');
+   const postData = new FormData();
+   postData.append('title', lessonFormData.title);
+   postData.append('video', lessonFormData.video);
+   postData.append('courseId', currentCourse._id);
    try {
-     if (currentUser) {
-       await axios.put(`/api/users/${currentUser._id}`, userFormData, {
-         headers: { Authorization: `Bearer ${token}` },
-       });
-     } else {
-       await axios.post('/api/users', userFormData, {
-         headers: { Authorization: `Bearer ${token}` },
-       });
-     }
-     fetchUsers();
-     handleUserDialogClose();
+     await axios.post('/api/lessons', postData, {
+       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+     });
+     handleLessonDialogClose();
    } catch (err) {
      console.error(err);
    }
@@ -216,6 +260,18 @@ const AdminPage = () => {
     }
   };
 
+  const fetchEnrollments = async (courseId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.get(`/api/courses/${courseId}/enrollments`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setEnrollments(res.data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <Container>
       <Box sx={{ my: 4 }}>
@@ -239,12 +295,28 @@ const AdminPage = () => {
           </Button>
           <List>
             {courses.map((course) => (
-              <ListItem key={course._id} divider>
-                <ListItemText
-                  primary={course.title}
-                  secondary={course.description}
-                />
-                <ListItemSecondaryAction>
+              <Accordion key={course._id} onChange={() => fetchEnrollments(course._id)}>
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <ListItemText
+                    primary={course.title}
+                    secondary={course.description}
+                  />
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography variant="h6">Enrolled Students</Typography>
+                  <List>
+                    {enrollments.map((enrollment) => (
+                      <ListItem key={enrollment._id}>
+                        <ListItemText primary={enrollment.student.name} secondary={enrollment.student.email} />
+                      </ListItem>
+                    ))}
+                  </List>
+                  <Button
+                    variant="outlined"
+                    onClick={() => handleLessonClickOpen(course)}
+                  >
+                    Add Lesson
+                  </Button>
                   <IconButton
                     edge="end"
                     aria-label="edit"
@@ -259,8 +331,8 @@ const AdminPage = () => {
                   >
                     <Delete />
                   </IconButton>
-                </ListItemSecondaryAction>
-              </ListItem>
+                </AccordionDetails>
+              </Accordion>
             ))}
           </List>
         </TabPanel>
@@ -508,6 +580,36 @@ const AdminPage = () => {
          <Button onClick={handleUserSubmit}>{currentUser ? 'Save' : 'Create'}</Button>
        </DialogActions>
      </Dialog>
+      <Dialog open={openLessonDialog} onClose={handleLessonDialogClose}>
+        <DialogTitle>Add Lesson</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            name="title"
+            label="Lesson Title"
+            type="text"
+            fullWidth
+            variant="standard"
+            value={lessonFormData.title}
+            onChange={handleLessonFormChange}
+          />
+          <Button variant="contained" component="label" sx={{ mt: 2 }}>
+            Upload Video
+            <input
+              type="file"
+              name="video"
+              hidden
+              onChange={handleLessonFormChange}
+            />
+          </Button>
+          {lessonFormData.video && <Typography variant="body2" sx={{ mt: 1 }}>{lessonFormData.video.name}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleLessonDialogClose}>Cancel</Button>
+          <Button onClick={handleLessonSubmit}>Add</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
